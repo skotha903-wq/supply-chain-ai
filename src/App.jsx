@@ -166,7 +166,7 @@ export default function App() {
           <div style={{fontSize:12,color:"#94a3b8",marginTop:2}}>Odoo 17 · Groq AI · ASN Automation</div>
         </div>
         <div style={{display:"flex",gap:8,alignItems:"center"}}>
-          {[["asn","📧 ASN Parser"],["dashboard","📦 Dashboard"]].map(([key,label])=>(
+          {[["asn","📧 ASN Parser"]].map(([key,label])=>(
             <button key={key} onClick={()=>setTab(key)} style={{fontSize:12,padding:"6px 14px",borderRadius:6,border:"none",background:tab===key?"#3b82f6":"#334155",color:"#fff",cursor:"pointer"}}>{label}</button>
           ))}
           <span style={{fontSize:12,color:"#94a3b8",marginLeft:4}}>👤 {currentUser}</span>
