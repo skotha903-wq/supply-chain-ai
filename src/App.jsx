@@ -1,5 +1,7 @@
 import { useState } from "react";
 
+const USERS = [{ username: "sarak", password: "S@ra2020" }];
+
 const SAMPLE_EMAILS = {
   local: `From: orders@woodcorner.com.au
 Subject: Purchase Order Confirmation — PO-2026-0042
@@ -64,7 +66,50 @@ function Badge({ state, late }) {
   return <span style={{background:"#fef9c3",color:"#854d0e",fontSize:10,padding:"2px 8px",borderRadius:10,fontWeight:500}}>{state}</span>;
 }
 
+function LoginScreen({ onLogin }) {
+  const [username, setUsername] = useState("");
+  const [password, setPassword] = useState("");
+  const [error, setError] = useState("");
+
+  function handleLogin(e) {
+    e.preventDefault();
+    const user = USERS.find(u => u.username === username && u.password === password);
+    if (user) { onLogin(user.username); }
+    else { setError("Invalid username or password."); }
+  }
+
+  return (
+    <div style={{minHeight:"100vh",background:"#f8fafc",display:"flex",alignItems:"center",justifyContent:"center",fontFamily:"system-ui,sans-serif"}}>
+      <div style={{background:"#fff",border:"1px solid #e2e8f0",borderRadius:16,padding:"2.5rem 2rem",width:"100%",maxWidth:380,boxShadow:"0 4px 24px rgba(0,0,0,0.06)"}}>
+        <div style={{textAlign:"center",marginBottom:"2rem"}}>
+          <div style={{fontSize:32,marginBottom:8}}>📦</div>
+          <div style={{fontSize:20,fontWeight:600,color:"#1e293b"}}>Supply Chain AI</div>
+          <div style={{fontSize:12,color:"#94a3b8",marginTop:4}}>Odoo 17 · Groq AI · ASN Automation</div>
+        </div>
+        <div style={{marginBottom:16}}>
+          <label style={{fontSize:12,color:"#64748b",display:"block",marginBottom:4}}>Username</label>
+          <input type="text" value={username} onChange={e=>{setUsername(e.target.value);setError("");}} placeholder="Enter username"
+            style={{width:"100%",padding:"10px 12px",fontSize:13,borderRadius:8,border:"1px solid #e2e8f0",boxSizing:"border-box",outline:"none"}}/>
+        </div>
+        <div style={{marginBottom:20}}>
+          <label style={{fontSize:12,color:"#64748b",display:"block",marginBottom:4}}>Password</label>
+          <input type="password" value={password} onChange={e=>{setPassword(e.target.value);setError("");}} placeholder="Enter password"
+            onKeyDown={e=>e.key==="Enter"&&handleLogin(e)}
+            style={{width:"100%",padding:"10px 12px",fontSize:13,borderRadius:8,border:"1px solid #e2e8f0",boxSizing:"border-box",outline:"none"}}/>
+        </div>
+        {error && <div style={{fontSize:12,padding:"8px 12px",borderRadius:6,marginBottom:12,background:"#fef2f2",color:"#dc2626"}}>{error}</div>}
+        <button onClick={handleLogin}
+          style={{width:"100%",padding:"11px",fontSize:14,fontWeight:500,borderRadius:8,border:"none",background:"#2563eb",color:"#fff",cursor:"pointer"}}>
+          Sign In
+        </button>
+      </div>
+    </div>
+  );
+}
+
 export default function App() {
+  const [loggedIn, setLoggedIn] = useState(false);
+  const [currentUser, setCurrentUser] = useState("");
   const [tab, setTab] = useState("asn");
   const [emailText, setEmailText] = useState("");
   const [parsing, setParsing] = useState(false);
@@ -73,30 +118,27 @@ export default function App() {
   const [aiText, setAiText] = useState("");
   const [aiLoading, setAiLoading] = useState(false);
 
+  if (!loggedIn) {
+    return <LoginScreen onLogin={(u) => { setLoggedIn(true); setCurrentUser(u); }} />;
+  }
+
   async function parseEmail() {
     if (!emailText.trim()) { setStatus("Please load or paste an email first."); return; }
-    setParsing(true);
-    setAsnData(null);
-    setStatus("Parsing...");
+    setParsing(true); setAsnData(null); setStatus("Parsing...");
     try {
       const res = await fetch("/api/parse-email", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
+        method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email: emailText })
       });
       const data = await res.json();
       if (data.error) throw new Error(data.error);
-      setAsnData(data);
-      setStatus("");
-    } catch(e) {
-      setStatus("Error: " + e.message);
-    }
+      setAsnData(data); setStatus("");
+    } catch(e) { setStatus("Error: " + e.message); }
     setParsing(false);
   }
 
   async function getInsight(type) {
-    setAiLoading(true);
-    setAiText("Analysing...");
+    setAiLoading(true); setAiText("Analysing...");
     const prompts = {
       risk: `Analyse this supply chain data and flag risks. Today is ${TODAY}. Plain text:\n${JSON.stringify(ODOO_DATA)}`,
       recommend: `Give 3-5 actionable supply chain recommendations. Today is ${TODAY}. Plain text:\n${JSON.stringify(ODOO_DATA)}`,
@@ -104,8 +146,7 @@ export default function App() {
     };
     try {
       const res = await fetch("/api/insight", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
+        method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ prompt: prompts[type] })
       });
       const data = await res.json();
@@ -121,10 +162,12 @@ export default function App() {
           <div style={{fontSize:18,fontWeight:600,color:"#fff"}}>Supply Chain AI</div>
           <div style={{fontSize:12,color:"#94a3b8",marginTop:2}}>Odoo 17 · Groq AI · ASN Automation</div>
         </div>
-        <div style={{display:"flex",gap:8}}>
+        <div style={{display:"flex",gap:8,alignItems:"center"}}>
           {[["asn","📧 ASN Parser"],["dashboard","📦 Dashboard"]].map(([key,label])=>(
             <button key={key} onClick={()=>setTab(key)} style={{fontSize:12,padding:"6px 14px",borderRadius:6,border:"none",background:tab===key?"#3b82f6":"#334155",color:"#fff",cursor:"pointer"}}>{label}</button>
           ))}
+          <span style={{fontSize:12,color:"#94a3b8",marginLeft:4}}>👤 {currentUser}</span>
+          <button onClick={()=>setLoggedIn(false)} style={{fontSize:12,padding:"6px 12px",borderRadius:6,border:"none",background:"#475569",color:"#fff",cursor:"pointer"}}>Sign out</button>
         </div>
       </div>
 
@@ -146,7 +189,6 @@ export default function App() {
             style={{marginTop:8,padding:"10px 24px",fontSize:13,fontWeight:500,borderRadius:8,border:"none",background:parsing?"#93c5fd":"#2563eb",color:"#fff",cursor:parsing?"not-allowed":"pointer"}}>
             {parsing?"⏳ Parsing...":"✦ Parse with AI"}
           </button>
-
           {asnData && (
             <div style={{marginTop:"1.5rem"}}>
               <div style={{fontSize:14,fontWeight:600,marginBottom:"1rem",color:"#1e293b"}}>📋 Extracted ASN</div>
