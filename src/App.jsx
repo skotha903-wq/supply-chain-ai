@@ -82,7 +82,7 @@ export default function App() {
   async function generatePDF() {
     setStatus("Generating PDF...");
     try {
-      const res = await fetch("http://localhost:3001/api/generate-pdf", {
+      const res = await fetch("/api/insight", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ asn: asnData })
