@@ -1,6 +1,9 @@
 import { useState } from "react";
 
-const USERS = [{ username: "sarak", password: "S@ra2020" }];
+const USERS = [
+  { username: "sarak", password: "S@ra2020" },
+  { username: "r.dikkala@gmail.com", password: "Warehouse2026" },
+];
 
 const SAMPLE_EMAILS = {
   local: `From: orders@woodcorner.com.au
