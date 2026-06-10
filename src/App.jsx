@@ -1,5 +1,10 @@
 import { useState } from "react";
 
+const USERS = [
+  { username: "sarak", password: "S@ra2020" },
+  { username: "r.dikkala@gmail.com", password: "Warehouse2026" },
+];
+
 const SAMPLE_EMAILS = {
   local: `From: orders@woodcorner.com.au
 Subject: Purchase Order Confirmation — PO-2026-0042
@@ -44,129 +49,311 @@ Items:
 Total Value: AUD $1,875.00`
 };
 
-const ODOO_DATA = [
-  {name:"WH/OUT/00006",type:"Delivery",partner:"Wood Corner",date:"2026-05-21",state:"assigned"},
-  {name:"WH/OUT/00002",type:"Delivery",partner:"Wood Corner",date:"2026-05-24",state:"assigned"},
-  {name:"WH/OUT/00007",type:"Delivery",partner:"Wood Corner",date:"2026-06-01",state:"assigned"},
-  {name:"WH/IN/00004",type:"Receipt",partner:"Wood Corner",date:"2026-06-08",state:"assigned"},
-  {name:"WH/IN/00003",type:"Receipt",partner:"Wood Corner",date:"2026-06-08",state:"assigned"},
-  {name:"WH/OUT/00001",type:"Delivery",partner:"Wood Corner",date:"2026-06-08",state:"assigned"},
-  {name:"WH/IN/00006",type:"Receipt",partner:"Ready Mat",date:"2026-06-08",state:"assigned"},
-];
+function Field({ label, value }) {
+  return (
+    <div style={{background:"#f8fafc",borderRadius:8,padding:"0.6rem 0.8rem",border:"1px solid #f1f5f9"}}>
+      <div style={{fontSize:10,color:"#94a3b8"}}>{label}</div>
+      <div style={{fontSize:13,fontWeight:500,marginTop:3,color:"#1e293b"}}>{value||"—"}</div>
+    </div>
+  );
+}
 
-const TODAY = "2026-06-08";
-function isLate(s) { return s.date < TODAY; }
+function LoginScreen({ onLogin }) {
+  const [username, setUsername] = useState("");
+  const [password, setPassword] = useState("");
+  const [error, setError] = useState("");
 
-function Badge({ state, late }) {
-  if (late) return <span style={{background:"#fee2e2",color:"#991b1b",fontSize:10,padding:"2px 8px",borderRadius:10,fontWeight:500}}>Late</span>;
-  if (state==="assigned") return <span style={{background:"#dcfce7",color:"#166534",fontSize:10,padding:"2px 8px",borderRadius:10,fontWeight:500}}>Ready</span>;
-  if (state==="draft") return <span style={{background:"#f3f4f6",color:"#6b7280",fontSize:10,padding:"2px 8px",borderRadius:10,fontWeight:500}}>Draft</span>;
-  return <span style={{background:"#fef9c3",color:"#854d0e",fontSize:10,padding:"2px 8px",borderRadius:10,fontWeight:500}}>{state}</span>;
+  function handleLogin(e) {
+    e.preventDefault();
+    const user = USERS.find(u => u.username === username && u.password === password);
+    if (user) { onLogin(user.username); }
+    else { setError("Invalid username or password."); }
+  }
+
+  return (
+    <div style={{minHeight:"100vh",background:"#f8fafc",display:"flex",alignItems:"center",justifyContent:"center",fontFamily:"system-ui,sans-serif"}}>
+      <div style={{background:"#fff",border:"1px solid #e2e8f0",borderRadius:16,padding:"2.5rem 2rem",width:"100%",maxWidth:380,boxShadow:"0 4px 24px rgba(0,0,0,0.06)"}}>
+        <div style={{textAlign:"center",marginBottom:"2rem"}}>
+          <div style={{fontSize:32,marginBottom:8}}>📦</div>
+          <div style={{fontSize:20,fontWeight:600,color:"#1e293b"}}>Supply Chain AI</div>
+          <div style={{fontSize:12,color:"#94a3b8",marginTop:4}}>Groq AI · ASN Automation</div>
+        </div>
+        <div style={{marginBottom:16}}>
+          <label style={{fontSize:12,color:"#64748b",display:"block",marginBottom:4}}>Username</label>
+          <input type="text" value={username} onChange={e=>{setUsername(e.target.value);setError("");}} placeholder="Enter username"
+            style={{width:"100%",padding:"10px 12px",fontSize:13,borderRadius:8,border:"1px solid #e2e8f0",boxSizing:"border-box",outline:"none"}}/>
+        </div>
+        <div style={{marginBottom:20}}>
+          <label style={{fontSize:12,color:"#64748b",display:"block",marginBottom:4}}>Password</label>
+          <input type="password" value={password} onChange={e=>{setPassword(e.target.value);setError("");}} placeholder="Enter password"
+            onKeyDown={e=>e.key==="Enter"&&handleLogin(e)}
+            style={{width:"100%",padding:"10px 12px",fontSize:13,borderRadius:8,border:"1px solid #e2e8f0",boxSizing:"border-box",outline:"none"}}/>
+        </div>
+        {error && <div style={{fontSize:12,padding:"8px 12px",borderRadius:6,marginBottom:12,background:"#fef2f2",color:"#dc2626"}}>{error}</div>}
+        <button onClick={handleLogin}
+          style={{width:"100%",padding:"11px",fontSize:14,fontWeight:500,borderRadius:8,border:"none",background:"#2563eb",color:"#fff",cursor:"pointer"}}>
+          Sign In
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function generatePDF(asn, type) {
+  const content = `
+SUPPLY CHAIN AI — ${type === "asn1" ? "ASN1 STANDARD" : "ASN2 DETAILED"} SHIPMENT NOTICE
+${"=".repeat(60)}
+Generated: ${new Date().toLocaleString()}
+
+SHIPMENT DETAILS
+${"─".repeat(60)}
+Reference:     ${asn.reference || "—"}
+Supplier:      ${asn.supplier || "—"}
+Ship From:     ${asn.shipFrom || "—"}
+Ship To:       ${asn.shipTo || "—"}
+Carrier:       ${asn.carrier || "—"}
+Tracking:      ${asn.tracking || "—"}
+ETA:           ${asn.eta || "—"}
+Total Value:   ${asn.totalValue || "—"}
+Shipment Type: ${asn.shipmentType || "—"}
+${type === "asn2" ? `
+INTERNATIONAL DETAILS
+${"─".repeat(60)}
+Incoterms:     ${asn.incoterms || "—"}
+Vessel:        ${asn.vessel || "—"}
+Bill of Lading:${asn.billOfLading || "—"}
+Container:     ${asn.container || "—"}
+ETD:           ${asn.etd || "—"}
+` : ""}
+ITEMS
+${"─".repeat(60)}
+${(asn.items || []).map((item, i) =>
+  `${i+1}. ${item.description}
+   SKU: ${item.sku} | Qty: ${item.qty} | Unit Price: ${item.unitPrice}${type === "asn2" && item.hsCode ? ` | HS Code: ${item.hsCode}` : ""}`
+).join("\n")}
+
+${"=".repeat(60)}
+This document was generated by Supply Chain AI
+  `.trim();
+
+  const blob = new Blob([content], { type: "text/plain" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `${type.toUpperCase()}_${asn.reference || "ASN"}_${new Date().toISOString().split("T")[0]}.txt`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+function sendWarehouseEmail(asn, type) {
+  const subject = encodeURIComponent(`ASN Notice — ${asn.reference || "Shipment"}`);
+  const items = (asn.items || []).map((item, i) =>
+    `${i+1}. ${item.description} (SKU: ${item.sku}) — Qty: ${item.qty} — ${item.unitPrice}`
+  ).join("\n");
+
+  const body = encodeURIComponent(`Dear Warehouse Team,
+
+Please find the ${type === "asn1" ? "Standard ASN (ASN1)" : "Detailed ASN (ASN2)"} details below:
+
+SHIPMENT DETAILS
+Reference:     ${asn.reference || "—"}
+Supplier:      ${asn.supplier || "—"}
+Ship From:     ${asn.shipFrom || "—"}
+Ship To:       ${asn.shipTo || "—"}
+Carrier:       ${asn.carrier || "—"}
+Tracking:      ${asn.tracking || "—"}
+ETA:           ${asn.eta || "—"}
+Total Value:   ${asn.totalValue || "—"}
+${type === "asn2" ? `
+Incoterms:     ${asn.incoterms || "—"}
+Vessel:        ${asn.vessel || "—"}
+Bill of Lading:${asn.billOfLading || "—"}
+Container:     ${asn.container || "—"}
+ETD:           ${asn.etd || "—"}
+` : ""}
+ITEMS
+${items}
+
+Please ensure the warehouse is ready to receive this shipment.
+
+Best regards,
+Supply Chain AI Team`);
+
+  window.open(`mailto:?subject=${subject}&body=${body}`, "_blank");
 }
 
 export default function App() {
-  const [tab, setTab] = useState("asn");
+  const [loggedIn, setLoggedIn] = useState(false);
+  const [currentUser, setCurrentUser] = useState("");
   const [emailText, setEmailText] = useState("");
   const [parsing, setParsing] = useState(false);
-  const [asnData, setAsnData] = useState(null);
+  const [asn1, setAsn1] = useState(null);
+  const [asn2, setAsn2] = useState(null);
   const [status, setStatus] = useState("");
-  const [aiText, setAiText] = useState("");
-  const [aiLoading, setAiLoading] = useState(false);
+  const [activeAsn, setActiveAsn] = useState("asn1");
+  const [warehouseEmail, setWarehouseEmail] = useState("");
+
+  if (!loggedIn) {
+    return <LoginScreen onLogin={(u) => { setLoggedIn(true); setCurrentUser(u); }} />;
+  }
 
   async function parseEmail() {
-    if (!emailText.trim()) { setStatus("Please load or paste an email first."); return; }
-    setParsing(true);
-    setAsnData(null);
-    setStatus("Parsing...");
+    if (!emailText.trim()) { setStatus("Please paste an email first."); return; }
+    setParsing(true); setAsn1(null); setAsn2(null); setStatus("Parsing...");
     try {
       const res = await fetch("/api/parse-email", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
+        method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email: emailText })
       });
       const data = await res.json();
       if (data.error) throw new Error(data.error);
-      setAsnData(data);
-      setStatus("");
-    } catch(e) {
-      setStatus("Error: " + e.message);
-    }
+
+      setAsn1({
+        reference: data.reference,
+        supplier: data.supplier,
+        shipFrom: data.shipFrom,
+        shipTo: data.shipTo,
+        carrier: data.carrier,
+        tracking: data.tracking,
+        eta: data.eta,
+        totalValue: data.totalValue,
+        shipmentType: data.shipmentType,
+        items: data.items,
+      });
+
+      setAsn2({
+        ...data,
+        vessel: data.vessel || "—",
+        billOfLading: data.billOfLading || "—",
+        container: data.container || "—",
+        incoterms: data.incoterms || "—",
+        etd: data.etd || "—",
+      });
+
+      setStatus(""); setActiveAsn("asn1");
+    } catch(e) { setStatus("Error: " + e.message); }
     setParsing(false);
   }
 
-  async function getInsight(type) {
-    setAiLoading(true);
-    setAiText("Analysing...");
-    const prompts = {
-      risk: `Analyse this supply chain data and flag risks. Today is ${TODAY}. Plain text:\n${JSON.stringify(ODOO_DATA)}`,
-      recommend: `Give 3-5 actionable supply chain recommendations. Today is ${TODAY}. Plain text:\n${JSON.stringify(ODOO_DATA)}`,
-      forecast: `Give a 2-week supply chain forecast. Today is ${TODAY}. Plain text:\n${JSON.stringify(ODOO_DATA)}`,
-    };
-    try {
-      const res = await fetch("/api/insight", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ prompt: prompts[type] })
-      });
-      const data = await res.json();
-      setAiText(data.text || "No response.");
-    } catch { setAiText("Error connecting to AI."); }
-    setAiLoading(false);
-  }
+  const currentAsn = activeAsn === "asn1" ? asn1 : asn2;
 
   return (
     <div style={{maxWidth:960,margin:"0 auto",padding:"2rem 1rem",fontFamily:"system-ui,sans-serif",background:"#f8fafc",minHeight:"100vh"}}>
       <div style={{background:"#1e293b",borderRadius:12,padding:"1.25rem 1.5rem",marginBottom:"1.5rem",display:"flex",alignItems:"center",justifyContent:"space-between",flexWrap:"wrap",gap:10}}>
         <div>
           <div style={{fontSize:18,fontWeight:600,color:"#fff"}}>Supply Chain AI</div>
-          <div style={{fontSize:12,color:"#94a3b8",marginTop:2}}>Odoo 17 · Groq AI · ASN Automation</div>
+          <div style={{fontSize:12,color:"#94a3b8",marginTop:2}}>Groq AI · ASN Automation</div>
         </div>
-        <div style={{display:"flex",gap:8}}>
-          {[["asn","📧 ASN Parser"],["dashboard","📦 Dashboard"]].map(([key,label])=>(
-            <button key={key} onClick={()=>setTab(key)} style={{fontSize:12,padding:"6px 14px",borderRadius:6,border:"none",background:tab===key?"#3b82f6":"#334155",color:"#fff",cursor:"pointer"}}>{label}</button>
-          ))}
+        <div style={{display:"flex",gap:8,alignItems:"center"}}>
+          <span style={{fontSize:12,color:"#94a3b8"}}>👤 {currentUser}</span>
+          <button onClick={()=>setLoggedIn(false)} style={{fontSize:12,padding:"6px 12px",borderRadius:6,border:"none",background:"#475569",color:"#fff",cursor:"pointer"}}>Sign out</button>
         </div>
       </div>
 
-      {tab==="asn" && (
-        <div style={{background:"#fff",border:"1px solid #e2e8f0",borderRadius:12,padding:"1.5rem"}}>
-          <div style={{fontSize:15,fontWeight:600,marginBottom:"1rem",color:"#1e293b"}}>📧 Email to ASN</div>
-          <div style={{fontSize:12,color:"#64748b",marginBottom:6}}>Load sample email:</div>
-          <div style={{display:"flex",gap:8,flexWrap:"wrap",marginBottom:12}}>
-            {[["local","🇦🇺 Local"],["international","🌏 International"],["urgent","⚡ Urgent"]].map(([key,label])=>(
-              <button key={key} onClick={()=>{setEmailText(SAMPLE_EMAILS[key]);setStatus("");setAsnData(null);}}
-                style={{fontSize:12,padding:"5px 12px",borderRadius:6,border:"1px solid #e2e8f0",background:"#f8fafc",cursor:"pointer",color:"#475569"}}>{label}</button>
-            ))}
-          </div>
-          <textarea value={emailText} onChange={e=>setEmailText(e.target.value)}
-            placeholder="Paste supplier email here or click a sample above..."
-            style={{width:"100%",height:180,padding:"0.75rem",fontSize:12,borderRadius:8,border:"1px solid #e2e8f0",fontFamily:"monospace",resize:"vertical",boxSizing:"border-box"}}/>
-          {status && <div style={{fontSize:12,padding:"8px 12px",borderRadius:6,margin:"8px 0",background:status.startsWith("Error")?"#fef2f2":"#eff6ff",color:status.startsWith("Error")?"#dc2626":"#2563eb"}}>{status}</div>}
-          <button onClick={parseEmail} disabled={parsing}
-            style={{marginTop:8,padding:"10px 24px",fontSize:13,fontWeight:500,borderRadius:8,border:"none",background:parsing?"#93c5fd":"#2563eb",color:"#fff",cursor:parsing?"not-allowed":"pointer"}}>
-            {parsing?"⏳ Parsing...":"✦ Parse with AI"}
-          </button>
+      {/* Email Input */}
+      <div style={{background:"#fff",border:"1px solid #e2e8f0",borderRadius:12,padding:"1.5rem",marginBottom:"1.5rem"}}>
+        <div style={{fontSize:15,fontWeight:600,marginBottom:"1rem",color:"#1e293b"}}>📧 Paste Supplier Email</div>
+        <div style={{fontSize:12,color:"#64748b",marginBottom:6}}>Or load a sample:</div>
+        <div style={{display:"flex",gap:8,flexWrap:"wrap",marginBottom:12}}>
+          {[["local","🇦🇺 Local"],["international","🌏 International"],["urgent","⚡ Urgent"]].map(([key,label])=>(
+            <button key={key} onClick={()=>{setEmailText(SAMPLE_EMAILS[key]);setStatus("");setAsn1(null);setAsn2(null);}}
+              style={{fontSize:12,padding:"5px 12px",borderRadius:6,border:"1px solid #e2e8f0",background:"#f8fafc",cursor:"pointer",color:"#475569"}}>{label}</button>
+          ))}
+        </div>
+        <textarea value={emailText} onChange={e=>setEmailText(e.target.value)}
+          placeholder="Paste your supplier email here..."
+          style={{width:"100%",height:200,padding:"0.75rem",fontSize:12,borderRadius:8,border:"1px solid #e2e8f0",fontFamily:"monospace",resize:"vertical",boxSizing:"border-box"}}/>
+        {status && <div style={{fontSize:12,padding:"8px 12px",borderRadius:6,margin:"8px 0",background:status.startsWith("Error")?"#fef2f2":"#eff6ff",color:status.startsWith("Error")?"#dc2626":"#2563eb"}}>{status}</div>}
+        <button onClick={parseEmail} disabled={parsing}
+          style={{marginTop:8,padding:"10px 28px",fontSize:13,fontWeight:500,borderRadius:8,border:"none",background:parsing?"#93c5fd":"#2563eb",color:"#fff",cursor:parsing?"not-allowed":"pointer"}}>
+          {parsing?"⏳ Generating ASN1 & ASN2...":"✦ Generate ASN1 & ASN2"}
+        </button>
+      </div>
 
-          {asnData && (
-            <div style={{marginTop:"1.5rem"}}>
-              <div style={{fontSize:14,fontWeight:600,marginBottom:"1rem",color:"#1e293b"}}>📋 Extracted ASN</div>
+      {/* Warehouse Email Input */}
+      {(asn1 || asn2) && (
+        <div style={{background:"#fff",border:"1px solid #e2e8f0",borderRadius:12,padding:"1rem 1.5rem",marginBottom:"1.5rem",display:"flex",gap:10,alignItems:"center",flexWrap:"wrap"}}>
+          <div style={{fontSize:13,fontWeight:500,color:"#1e293b"}}>📬 Warehouse Email:</div>
+          <input type="email" value={warehouseEmail} onChange={e=>setWarehouseEmail(e.target.value)}
+            placeholder="warehouse@company.com"
+            style={{flex:1,minWidth:200,padding:"8px 12px",fontSize:13,borderRadius:8,border:"1px solid #e2e8f0",outline:"none"}}/>
+        </div>
+      )}
+
+      {/* ASN Results */}
+      {(asn1 || asn2) && (
+        <div>
+          <div style={{display:"flex",gap:8,marginBottom:"1rem"}}>
+            <button onClick={()=>setActiveAsn("asn1")}
+              style={{fontSize:13,padding:"8px 20px",borderRadius:8,border:"none",fontWeight:500,cursor:"pointer",background:activeAsn==="asn1"?"#2563eb":"#e2e8f0",color:activeAsn==="asn1"?"#fff":"#475569"}}>
+              📋 ASN1 — Standard
+            </button>
+            <button onClick={()=>setActiveAsn("asn2")}
+              style={{fontSize:13,padding:"8px 20px",borderRadius:8,border:"none",fontWeight:500,cursor:"pointer",background:activeAsn==="asn2"?"#7c3aed":"#e2e8f0",color:activeAsn==="asn2"?"#fff":"#475569"}}>
+              📦 ASN2 — Detailed
+            </button>
+          </div>
+
+          {activeAsn==="asn1" && asn1 && (
+            <div style={{background:"#fff",border:"2px solid #2563eb",borderRadius:12,padding:"1.5rem"}}>
+              <div style={{fontSize:14,fontWeight:600,marginBottom:"1rem",color:"#2563eb"}}>📋 ASN1 — Standard Shipment Notice</div>
               <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(150px,1fr))",gap:10,marginBottom:"1rem"}}>
-                {[["Reference",asnData.reference],["Supplier",asnData.supplier],["Ship From",asnData.shipFrom],["Ship To",asnData.shipTo],["Carrier",asnData.carrier],["Tracking",asnData.tracking],["ETA",asnData.eta],["Type",asnData.shipmentType],["Total Value",asnData.totalValue],["Incoterms",asnData.incoterms||"N/A"]].map(([label,value])=>(
-                  <div key={label} style={{background:"#f8fafc",borderRadius:8,padding:"0.6rem 0.8rem",border:"1px solid #f1f5f9"}}>
-                    <div style={{fontSize:10,color:"#94a3b8"}}>{label}</div>
-                    <div style={{fontSize:13,fontWeight:500,marginTop:3,color:"#1e293b"}}>{value||"—"}</div>
-                  </div>
-                ))}
+                <Field label="Reference" value={asn1.reference}/>
+                <Field label="Supplier" value={asn1.supplier}/>
+                <Field label="Ship From" value={asn1.shipFrom}/>
+                <Field label="Ship To" value={asn1.shipTo}/>
+                <Field label="Carrier" value={asn1.carrier}/>
+                <Field label="Tracking" value={asn1.tracking}/>
+                <Field label="ETA" value={asn1.eta}/>
+                <Field label="Total Value" value={asn1.totalValue}/>
+                <Field label="Shipment Type" value={asn1.shipmentType}/>
               </div>
-              {asnData.shipmentType==="international" && (
+              <table style={{width:"100%",borderCollapse:"collapse",fontSize:12,marginBottom:"1rem"}}>
+                <thead><tr style={{background:"#eff6ff"}}>{["SKU","Description","Qty","Unit Price"].map(h=><th key={h} style={{textAlign:"left",color:"#1d4ed8",padding:"8px 10px",fontWeight:500,borderBottom:"1px solid #bfdbfe"}}>{h}</th>)}</tr></thead>
+                <tbody>{asn1.items?.map((item,i)=>(
+                  <tr key={i} style={{background:i%2===0?"#fff":"#f8fafc"}}>
+                    <td style={{padding:"8px 10px",fontFamily:"monospace",fontSize:11}}>{item.sku}</td>
+                    <td style={{padding:"8px 10px"}}>{item.description}</td>
+                    <td style={{padding:"8px 10px",fontWeight:500}}>{item.qty}</td>
+                    <td style={{padding:"8px 10px"}}>{item.unitPrice}</td>
+                  </tr>
+                ))}</tbody>
+              </table>
+              <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
+                <button onClick={()=>generatePDF(asn1,"asn1")} style={{fontSize:12,padding:"8px 16px",borderRadius:6,border:"none",background:"#7c3aed",color:"#fff",cursor:"pointer",fontWeight:500}}>📄 Download PDF</button>
+                <button onClick={()=>sendWarehouseEmail(asn1,"asn1")} style={{fontSize:12,padding:"8px 16px",borderRadius:6,border:"none",background:"#0891b2",color:"#fff",cursor:"pointer",fontWeight:500}}>📧 Email Warehouse</button>
+              </div>
+            </div>
+          )}
+
+          {activeAsn==="asn2" && asn2 && (
+            <div style={{background:"#fff",border:"2px solid #7c3aed",borderRadius:12,padding:"1.5rem"}}>
+              <div style={{fontSize:14,fontWeight:600,marginBottom:"1rem",color:"#7c3aed"}}>📦 ASN2 — Detailed Shipment Notice</div>
+              {asn2.shipmentType==="international" && (
                 <div style={{background:"#fefce8",border:"1px solid #fde68a",borderRadius:8,padding:"0.75rem",marginBottom:"1rem",fontSize:12,color:"#92400e"}}>
                   ⚠️ International shipment — customs clearance required.
                 </div>
               )}
+              <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(150px,1fr))",gap:10,marginBottom:"1rem"}}>
+                <Field label="Reference" value={asn2.reference}/>
+                <Field label="Supplier" value={asn2.supplier}/>
+                <Field label="Ship From" value={asn2.shipFrom}/>
+                <Field label="Ship To" value={asn2.shipTo}/>
+                <Field label="Carrier" value={asn2.carrier}/>
+                <Field label="Tracking" value={asn2.tracking}/>
+                <Field label="ETA" value={asn2.eta}/>
+                <Field label="ETD" value={asn2.etd}/>
+                <Field label="Total Value" value={asn2.totalValue}/>
+                <Field label="Incoterms" value={asn2.incoterms}/>
+                <Field label="Vessel" value={asn2.vessel}/>
+                <Field label="Bill of Lading" value={asn2.billOfLading}/>
+                <Field label="Container" value={asn2.container}/>
+                <Field label="Shipment Type" value={asn2.shipmentType}/>
+              </div>
               <table style={{width:"100%",borderCollapse:"collapse",fontSize:12,marginBottom:"1rem"}}>
-                <thead><tr style={{background:"#f8fafc"}}>{["SKU","Description","Qty","Unit Price","HS Code"].map(h=><th key={h} style={{textAlign:"left",color:"#64748b",padding:"8px 10px",fontWeight:500,borderBottom:"1px solid #e2e8f0"}}>{h}</th>)}</tr></thead>
-                <tbody>{asnData.items?.map((item,i)=>(
-                  <tr key={i} style={{background:i%2===0?"#fff":"#fafafa"}}>
+                <thead><tr style={{background:"#f5f3ff"}}>{["SKU","Description","Qty","Unit Price","HS Code"].map(h=><th key={h} style={{textAlign:"left",color:"#6d28d9",padding:"8px 10px",fontWeight:500,borderBottom:"1px solid #ddd6fe"}}>{h}</th>)}</tr></thead>
+                <tbody>{asn2.items?.map((item,i)=>(
+                  <tr key={i} style={{background:i%2===0?"#fff":"#f8fafc"}}>
                     <td style={{padding:"8px 10px",fontFamily:"monospace",fontSize:11}}>{item.sku}</td>
                     <td style={{padding:"8px 10px"}}>{item.description}</td>
                     <td style={{padding:"8px 10px",fontWeight:500}}>{item.qty}</td>
@@ -176,51 +363,11 @@ export default function App() {
                 ))}</tbody>
               </table>
               <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
-                <button onClick={()=>setStatus("✅ ASN created in Odoo!")} style={{fontSize:12,padding:"8px 16px",borderRadius:6,border:"none",background:"#16a34a",color:"#fff",cursor:"pointer",fontWeight:500}}>✅ Create in Odoo</button>
-                <button onClick={()=>setStatus("📄 PDF generated!")} style={{fontSize:12,padding:"8px 16px",borderRadius:6,border:"none",background:"#7c3aed",color:"#fff",cursor:"pointer",fontWeight:500}}>📄 Generate PDF</button>
-                <button onClick={()=>setStatus("📧 Email sent to warehouse!")} style={{fontSize:12,padding:"8px 16px",borderRadius:6,border:"none",background:"#0891b2",color:"#fff",cursor:"pointer",fontWeight:500}}>📧 Email Warehouse</button>
+                <button onClick={()=>generatePDF(asn2,"asn2")} style={{fontSize:12,padding:"8px 16px",borderRadius:6,border:"none",background:"#7c3aed",color:"#fff",cursor:"pointer",fontWeight:500}}>📄 Download PDF</button>
+                <button onClick={()=>sendWarehouseEmail(asn2,"asn2")} style={{fontSize:12,padding:"8px 16px",borderRadius:6,border:"none",background:"#0891b2",color:"#fff",cursor:"pointer",fontWeight:500}}>📧 Email Warehouse</button>
               </div>
-              {status && <div style={{marginTop:"0.75rem",fontSize:13,color:"#16a34a",fontWeight:500}}>{status}</div>}
             </div>
           )}
-        </div>
-      )}
-
-      {tab==="dashboard" && (
-        <div>
-          <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(140px,1fr))",gap:10,marginBottom:"1.25rem"}}>
-            {[["Total",ODOO_DATA.length,"#1e293b"],["Ready",ODOO_DATA.filter(s=>s.state==="assigned").length,"#16a34a"],["Late",ODOO_DATA.filter(isLate).length,"#dc2626"],["Draft",ODOO_DATA.filter(s=>s.state==="draft").length,"#d97706"]].map(([label,val,color])=>(
-              <div key={label} style={{background:"#fff",border:"1px solid #e2e8f0",borderRadius:10,padding:"1rem"}}>
-                <div style={{fontSize:11,color:"#94a3b8"}}>{label}</div>
-                <div style={{fontSize:28,fontWeight:600,color,marginTop:4}}>{val}</div>
-              </div>
-            ))}
-          </div>
-          <div style={{background:"#fff",border:"1px solid #e2e8f0",borderRadius:12,padding:"1.25rem",marginBottom:"1rem"}}>
-            <div style={{fontSize:14,fontWeight:600,marginBottom:"1rem",color:"#1e293b"}}>Shipments</div>
-            <table style={{width:"100%",borderCollapse:"collapse",fontSize:12}}>
-              <thead><tr style={{background:"#f8fafc"}}>{["Reference","Type","Partner","Date","Status"].map(h=><th key={h} style={{textAlign:"left",color:"#64748b",padding:"8px 10px",fontWeight:500,borderBottom:"1px solid #e2e8f0"}}>{h}</th>)}</tr></thead>
-              <tbody>{ODOO_DATA.map((s,i)=>(
-                <tr key={s.name} style={{background:i%2===0?"#fff":"#fafafa"}}>
-                  <td style={{padding:"8px 10px",fontFamily:"monospace",fontSize:11}}>{s.name}</td>
-                  <td style={{padding:"8px 10px"}}>{s.type}</td>
-                  <td style={{padding:"8px 10px"}}>{s.partner}</td>
-                  <td style={{padding:"8px 10px"}}>{s.date}</td>
-                  <td style={{padding:"8px 10px"}}><Badge state={s.state} late={isLate(s)}/></td>
-                </tr>
-              ))}</tbody>
-            </table>
-          </div>
-          <div style={{background:"#fff",border:"1px solid #bfdbfe",borderRadius:12,padding:"1.25rem"}}>
-            <div style={{fontSize:14,fontWeight:600,marginBottom:"0.75rem",color:"#1d4ed8"}}>✦ AI analysis</div>
-            <div style={{fontSize:13,lineHeight:1.7,whiteSpace:"pre-wrap",color:aiLoading?"#94a3b8":"#334155",minHeight:60}}>{aiText||"Click a button to get AI insights."}</div>
-            <div style={{display:"flex",gap:8,flexWrap:"wrap",marginTop:"0.75rem"}}>
-              {[["Risk analysis","risk"],["Recommendations","recommend"],["Demand forecast","forecast"]].map(([label,type])=>(
-                <button key={type} onClick={()=>getInsight(type)} disabled={aiLoading}
-                  style={{fontSize:12,padding:"6px 14px",borderRadius:6,border:"1px solid #bfdbfe",background:"#eff6ff",color:"#1d4ed8",cursor:"pointer",fontWeight:500}}>{label}</button>
-              ))}
-            </div>
-          </div>
         </div>
       )}
     </div>
