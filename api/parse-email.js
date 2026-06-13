@@ -1,52 +1,15 @@
 export default async function handler(req, res) {
-  if (req.method !== 'POST') return res.status(405).end();
+  if (req.method !== "POST") return res.status(405).json({ error: "Method not allowed" });
   const { email } = req.body;
-  const prompt = `You are a supply chain data extraction expert. Extract ASN data from this supplier email and return ONLY a JSON object with no explanation, no markdown, no backticks.
-
-Return exactly this structure:
-{
-  "reference": "ASN reference number or PO number",
-  "supplier": "supplier company name",
-  "shipFrom": "origin address or port",
-  "shipTo": "destination address",
-  "carrier": "carrier or vessel name",
-  "tracking": "tracking number or bill of lading",
-  "eta": "estimated arrival date",
-  "shipmentType": "local or international",
-  "totalValue": "total value with currency",
-  "incoterms": "incoterms if international or null",
-  "items": [
-    {
-      "sku": "product SKU",
-      "description": "product name",
-      "qty": 0,
-      "unitPrice": "unit price as string",
-      "hsCode": "HS code if international or null"
-    }
-  ]
-}
-
-Email:
-${email}`;
-
+  if (!email) return res.status(400).json({ error: "No email provided" });
+  const GROQ_KEY = process.env.GROQ_KEY;
+  if (!GROQ_KEY) return res.status(500).json({ error: "GROQ_KEY not set in Vercel environment variables" });
+  const prompt = `Parse this supplier email and extract TWO structured ASN documents.\nASN 1 = formal structured ASN with all fields.\nASN 2 = simplified warehouse-ready version.\nInclude: ASN Reference, PO Number, Supplier, Ship Date, ETA, Carrier, Tracking, Line Items (SKU, Description, Qty, UOM, Batch, Expiry), Totals.\nSeparate with ---\n\nEmail:\n${email}`;
   try {
-    const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "Authorization": `Bearer ${process.env.GROQ_KEY}`
-      },
-      body: JSON.stringify({
-        model: "llama-3.3-70b-versatile",
-        messages: [{ role: "user", content: prompt }]
-      })
-    });
+    const response = await fetch("https://api.groq.com/openai/v1/chat/completions", { method: "POST", headers: { "Content-Type": "application/json", "Authorization": `Bearer ${GROQ_KEY}` }, body: JSON.stringify({ model: "llama-3.3-70b-versatile", messages: [{ role: "user", content: prompt }], temperature: 0.1 }) });
     const data = await response.json();
     const text = data.choices?.[0]?.message?.content || "";
-    const clean = text.replace(/```json|```/g, "").trim();
-    const parsed = JSON.parse(clean);
-    res.json(parsed);
-  } catch(e) {
-    res.status(500).json({ error: "Failed to parse: " + e.message });
-  }
+    const parts = text.split("---");
+    return res.json({ asn1: parts[0]?.trim() || text, asn2: parts[1]?.trim() || "" });
+  } catch (err) { return res.status(500).json({ error: `Groq API error: ${err.message}` }); }
 }
