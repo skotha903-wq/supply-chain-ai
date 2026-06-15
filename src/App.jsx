@@ -1,268 +1,645 @@
 import { useState } from "react";
-import ConsignmentTracker from "./ConsignmentTracker";
-import InboundReceiving from "./InboundReceiving";
-import ExpiryManagement from "./ExpiryManagement";
-import WardDistribution from "./WardDistribution";
-import RecallManagement from "./RecallManagement";
-import { printAsPDF, downloadCSV, sendExpiryAlert } from "./utils";
 
 const USERS = [
-  { username:"sarak", password:"S@ra2020", role:"admin", org:"Royal Melbourne Hospital" },
-  { username:"admin", password:"Admin@123", role:"admin", org:"Royal Melbourne Hospital" },
-  { username:"ward1", password:"Ward@123", role:"staff", org:"Royal Melbourne Hospital" },
+  { username: "sarak", password: "supply2026" },
+  { username: "admin", password: "admin123" },
 ];
 
-const SAMPLE_EMAILS = [
-  { label:"AU Supplier", text:"From: brett@southerncross.com.au\nASN Reference: ASN-20240613\nPurchase Order: PO-88123\nShip Date: 2024-06-13\nETA: 2024-06-16\nCarrier: StarTrack\nTracking: TRK99887766\n\nItems:\n- SKU: ELE-4521-A | Control Module | Qty: 50 EA | Batch: BT-11234\n- SKU: MEC-8834-B | Bearing Assembly | Qty: 20 SET | Batch: BT-11235\n\nCartons: 12 | Weight: 240 kg" },
-  { label:"China Supplier", text:"From: export@zhonghua.cn\nASN No: ASN-CN-88712\nPO: PO-77654\nETA: 2024-06-28\nCarrier: Maersk Line\nTracking: MRKU1234567\n\nItems:\n- SKU: ELE-9987-I | LED Driver 100W | Qty: 200 EA | Batch: BT-55001\n\nCartons: 30 | Weight: 850 kg" },
-  { label:"Urgent Medical", text:"URGENT SHIPMENT\nFrom: logistics@stryker.com.au\nASN: ASN-URGENT-001\nPO: PO-HOSP-9921\nETA: 2024-06-14 NEXT DAY\nCarrier: DHL Express\nTracking: DHL9988001122\n\nItems:\n- SKU: STR-TRI-001 | Triathlon Knee System | Qty: 2 EA | Batch: BT-20240613\n- SKU: STR-CAL-002 | Calys Tibial Tray | Qty: 4 EA | Batch: BT-20240614\n\nCartons: 3 | Weight: 18 kg | FRAGILE" },
-];
+const SAMPLE_EMAILS = {
+  local: `From: David Chen <david.chen@melbourneparts.com.au>
+To: receiving@warehouse.com
+Subject: ASN - Purchase Order PO-2026-04821
 
-const bg = "#0f1117";
-const surface = "#1a1d27";
-const bdr = "1px solid #2a2d3a";
+Hi team,
 
-const S = {
-  page: { minHeight:"100vh", background:bg, color:"#e8eaf0", fontFamily:"system-ui,sans-serif" },
-  header: { background:surface, borderBottom:bdr, padding:"14px 24px", display:"flex", alignItems:"center", gap:12 },
-  input: { width:"100%", padding:"10px 12px", background:bg, border:bdr, borderRadius:8, color:"#e8eaf0", fontSize:14, outline:"none", boxSizing:"border-box" },
-  btn: (c) => ({ padding:"10px 20px", background:c||"#4f8ef7", border:"none", borderRadius:8, color:"#fff", fontWeight:600, fontSize:13, cursor:"pointer" }),
-  btnSm: (c) => ({ padding:"5px 12px", background:"transparent", border:"1px solid "+(c||"#4f8ef7"), borderRadius:6, color:c||"#4f8ef7", fontSize:11, cursor:"pointer" }),
-  card: { background:surface, border:bdr, borderRadius:10, padding:20 },
-  metric: { background:bg, borderRadius:8, padding:"14px 16px" },
-  label: { fontSize:11, fontWeight:600, letterSpacing:"0.07em", color:"#8b8fa8", textTransform:"uppercase", display:"block", marginBottom:6 },
+Please find below the advance shipment notice for your purchase order.
+
+Purchase Order: PO-2026-04821
+Supplier: Melbourne Parts Co. Pty Ltd
+ABN: 47 123 456 789
+Ship Date: 16 Jun 2026
+ETA: 18 Jun 2026
+Carrier: StarTrack Express
+Tracking: ST-9982334411
+
+Line Items:
+1. SKU: MP-VALVE-25NB | Description: Ball Valve 25NB SS316 | Qty: 50 | UOM: EA | Batch: BV-260601
+2. SKU: MP-PIPE-50NB | Description: ERW Pipe 50NB Sch40 6m | Qty: 20 | UOM: LGT | Batch: PIP-260612
+3. SKU: MP-FLANGE-25 | Description: Flange Slip-On 25NB 150# | Qty: 100 | UOM: EA | Batch: FL-260598
+
+Total Pallets: 3
+Gross Weight: 840 kg
+
+Please confirm receipt.
+David Chen | Logistics Manager`,
+
+  international: `From: Jenny Wu <jenny.wu@shenzhenlogistics.cn>
+To: imports@warehouse.com
+Subject: ASN for PO-2026-08841 - International Shipment
+
+Dear Team,
+
+Advanced Shipment Notice for your international order.
+
+Purchase Order: PO-2026-08841
+Supplier: Shenzhen Logistics Co. Ltd
+Ship Date: 14 Jun 2026
+ETA: 28 Jun 2026
+Carrier: DHL Express
+Tracking: 1Z9A8W7R034200001
+Port of Loading: Shanghai (CNSHA)
+Port of Discharge: Melbourne (AUMEL)
+Incoterm: FOB Shanghai
+
+Line Items:
+1. SKU: ELEC-4490-BLK | Description: Industrial Control Module 24VDC | Qty: 200 | UOM: EA | HS Code: 8537.10.9000 | COO: CN
+2. SKU: ELEC-2201-WHT | Description: Panel Mount Switch IP65 | Qty: 500 | UOM: EA | HS Code: 8536.50.9000 | COO: CN
+3. SKU: CABLE-12C-15M | Description: 12-Core Shielded Cable 15m | Qty: 100 | UOM: ROL | HS Code: 8544.49.0000 | COO: CN
+
+Total Cartons: 18 | Gross Weight: 620 kg | Volume: 2.4 CBM
+
+Jenny Wu | Export Manager`,
 };
 
-function Login({ onLogin }) {
+function LoginScreen({ onLogin }) {
   const [u, setU] = useState("");
   const [p, setP] = useState("");
   const [err, setErr] = useState("");
-  const submit = () => {
-    const m = USERS.find(x => x.username === u && x.password === p);
-    if (m) onLogin(m);
-    else setErr("Invalid credentials.");
-  };
-  return (
-    <div style={{ ...S.page, display:"flex", alignItems:"center", justifyContent:"center" }}>
-      <div style={{ ...S.card, width:380 }}>
-        <div style={{ textAlign:"center", marginBottom:24 }}>
-          <div style={{ fontSize:40, marginBottom:10 }}>🏥</div>
-          <h2 style={{ fontSize:20, fontWeight:600, margin:0 }}>Hospital Supply Chain</h2>
-          <p style={{ fontSize:13, color:"#8b8fa8", margin:"6px 0 0" }}>Logistics and Consignment Management</p>
-        </div>
-        {err && <p style={{ color:"#ef4444", fontSize:12, marginBottom:10 }}>{err}</p>}
-        <div style={{ marginBottom:12 }}>
-          <label style={S.label}>Username</label>
-          <input style={S.input} value={u} onChange={e => setU(e.target.value)} onKeyDown={e => e.key==="Enter" && submit()} placeholder="sarak" />
-        </div>
-        <div style={{ marginBottom:16 }}>
-          <label style={S.label}>Password</label>
-          <input type="password" style={S.input} value={p} onChange={e => setP(e.target.value)} onKeyDown={e => e.key==="Enter" && submit()} />
-        </div>
-        <button style={{ ...S.btn(), width:"100%" }} onClick={submit}>Sign in</button>
-        <div style={{ marginTop:14, padding:12, background:bg, borderRadius:8, fontSize:11, color:"#8b8fa8" }}>
-          <div style={{ marginBottom:4, fontWeight:600 }}>Demo accounts:</div>
-          <div>Admin: sarak / S@ra2020</div>
-          <div>Staff: ward1 / Ward@123</div>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function ASNParser() {
-  const [email, setEmail] = useState("");
-  const [asn1, setAsn1] = useState("");
-  const [asn2, setAsn2] = useState("");
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
 
-  const parse = async () => {
-    if (!email.trim()) return;
-    setLoading(true); setError(""); setAsn1(""); setAsn2("");
-    try {
-      const r = await fetch("/api/parse-email", { method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({ email }) });
-      const d = await r.json();
-      if (d.error) { setError(d.error); return; }
-      setAsn1(d.asn1 || d.result || "");
-      setAsn2(d.asn2 || "");
-    } catch {
-      setError("Error connecting to Groq API. Check GROQ_KEY in Vercel.");
-    }
-    setLoading(false);
-  };
-
-  const downloadASN = () => {
-    if (!asn1) return;
-    const content = "ASN 1:\n" + "=".repeat(40) + "\n" + asn1 + "\n\nASN 2:\n" + "=".repeat(40) + "\n" + asn2;
-    const blob = new Blob([content], { type:"text/plain" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url; a.download = "ASN-" + Date.now() + ".txt"; a.click();
-    URL.revokeObjectURL(url);
-  };
-
-  const emailWarehouse = () => {
-    const subject = encodeURIComponent("ASN Notice — Action Required");
-    const body = encodeURIComponent("ASN 1:\n" + asn1 + "\n\nASN 2:\n" + asn2);
-    window.open("https://mail.google.com/mail/?view=cm&to=supplychain.asn@gmail.com&su=" + subject + "&body=" + body, "_blank");
+  const handleLogin = () => {
+    setLoading(true);
+    setErr("");
+    setTimeout(() => {
+      const match = USERS.find((x) => x.username === u && x.password === p);
+      if (match) onLogin(u);
+      else setErr("Username or password is incorrect.");
+      setLoading(false);
+    }, 600);
   };
 
   return (
-    <div style={S.page}>
-      <div style={S.header}>
-        <span style={{ fontSize:24 }}>📧</span>
-        <div>
-          <div style={{ fontSize:16, fontWeight:600 }}>ASN Parser</div>
-          <div style={{ fontSize:11, color:"#8b8fa8" }}>Groq AI · LLaMA 3.3 70B</div>
+    <div style={styles.loginBg}>
+      <div style={styles.loginCard}>
+        <div style={styles.loginLogo}>
+          <span style={styles.logoIcon}>⬡</span>
+          <span style={styles.logoText}>
+            Supply<span style={{ color: "#5A8FFF" }}>Chain</span> AI
+          </span>
         </div>
-      </div>
-      <div style={{ padding:"24px", maxWidth:900, margin:"0 auto" }}>
-        <div style={{ ...S.card, marginBottom:14 }}>
-          <div style={{ display:"flex", gap:8, flexWrap:"wrap", marginBottom:14 }}>
-            {SAMPLE_EMAILS.map((s,i) => (
-              <button key={i} style={{ padding:"6px 14px", borderRadius:8, fontSize:12, cursor:"pointer", border:bdr, background:"transparent", color:"#8b8fa8" }} onClick={() => setEmail(s.text)}>{s.label}</button>
-            ))}
-          </div>
-          <label style={S.label}>Paste supplier email</label>
-          <textarea style={{ ...S.input, minHeight:200, resize:"vertical", fontFamily:"monospace", marginBottom:12 }} value={email} onChange={e => setEmail(e.target.value)} placeholder="Paste supplier email here..." />
-          <button style={{ ...S.btn(), padding:"10px 24px" }} onClick={parse} disabled={loading}>
-            {loading ? "Parsing..." : "Generate ASN 1 and ASN 2"}
-          </button>
-          {error && <p style={{ color:"#ef4444", fontSize:12, marginTop:10 }}>{error}</p>}
+        <p style={styles.loginSub}>ASN Intelligence Platform</p>
+        <div style={styles.field}>
+          <label style={styles.label}>Username</label>
+          <input
+            style={styles.input}
+            value={u}
+            onChange={(e) => setU(e.target.value)}
+            placeholder="Enter username"
+            onKeyDown={(e) => e.key === "Enter" && handleLogin()}
+          />
         </div>
-        {(asn1 || asn2) && (
-          <div>
-            <div style={{ display:"flex", gap:8, marginBottom:14, flexWrap:"wrap" }}>
-              <button style={S.btn("#22c55e")} onClick={downloadASN}>Download ASN</button>
-              <button style={S.btn("#4f8ef7")} onClick={emailWarehouse}>Email Warehouse</button>
-              <button style={S.btn("#a855f7")} onClick={() => printAsPDF("ASN Report")}>Print PDF</button>
-            </div>
-            <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:14 }}>
-              {[["ASN 1", asn1],["ASN 2", asn2]].map(([l,v]) => v && (
-                <div key={l} style={S.card}>
-                  <div style={{ fontWeight:600, fontSize:13, marginBottom:10, color:"#4f8ef7" }}>{l}</div>
-                  <pre style={{ fontSize:11, color:"#8b8fa8", whiteSpace:"pre-wrap", margin:0, fontFamily:"monospace", lineHeight:1.7 }}>{v}</pre>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
+        <div style={styles.field}>
+          <label style={styles.label}>Password</label>
+          <input
+            type="password"
+            style={styles.input}
+            value={p}
+            onChange={(e) => setP(e.target.value)}
+            placeholder="Enter password"
+            onKeyDown={(e) => e.key === "Enter" && handleLogin()}
+          />
+        </div>
+        {err && <div style={styles.errMsg}>{err}</div>}
+        <button
+          style={{ ...styles.btnPrimary, width: "100%", marginTop: "1.5rem" }}
+          onClick={handleLogin}
+          disabled={loading}
+        >
+          {loading ? "Signing in…" : "Sign in"}
+        </button>
+        <p style={styles.loginHint}>
+          Supply Chain AI · Internal Access Only
+        </p>
       </div>
     </div>
   );
 }
 
-function Dashboard({ onNav, user }) {
-  const MODULES = [
-    { id:"asn", icon:"📧", title:"ASN Parser", desc:"Groq AI email to ASN 1 and ASN 2", color:"#4f8ef7", kpi:"3 pending" },
-    { id:"inbound", icon:"📦", title:"Inbound Receiving", desc:"GRN, 3-way match, cold chain", color:"#22c55e", kpi:"2 ASNs due" },
-    { id:"consignment", icon:"🔬", title:"Consignment Manager", desc:"Implant tracking and reconciliation", color:"#a855f7", kpi:"386 lines" },
-    { id:"expiry", icon:"📅", title:"Expiry Management", desc:"FEFO and 90/60/30 day alerts", color:"#f59e0b", kpi:"4 expiring" },
-    { id:"ward", icon:"🚚", title:"Ward Distribution", desc:"Requisitions, delivery, returns", color:"#14b8a6", kpi:"99.2% fill" },
-    { id:"recall", icon:"🚨", title:"Recall Management", desc:"TGA recall and batch traceability", color:"#ef4444", kpi:"1 ACTIVE" },
-  ];
-
-  const exportKPIs = () => {
-    const rows = [
-      ["Hospital Supply Chain Dashboard"],
-      ["Generated: " + new Date().toLocaleString()],
-      ["Organisation: " + user.org],
-      [""],
-      ["KPI","Value"],
-      ["ASNs pending","3"],
-      ["GRNs today","7"],
-      ["Consignment lines","386"],
-      ["Expiring 30d","4"],
-      ["Ward fill rate","99.2%"],
-      ["Active recalls","1"],
-    ];
-    downloadCSV(rows, "Dashboard-" + new Date().toISOString().split("T")[0] + ".csv");
+function Badge({ label, color }) {
+  const colors = {
+    green: { bg: "#d1fae5", text: "#065f46" },
+    blue: { bg: "#dbeafe", text: "#1e40af" },
+    amber: { bg: "#fef3c7", text: "#92400e" },
+    red: { bg: "#fee2e2", text: "#991b1b" },
+    purple: { bg: "#ede9fe", text: "#5b21b6" },
+    gray: { bg: "#f3f4f6", text: "#374151" },
   };
+  const c = colors[color] || colors.gray;
+  return (
+    <span
+      style={{
+        background: c.bg,
+        color: c.text,
+        borderRadius: "100px",
+        padding: "2px 10px",
+        fontSize: "11px",
+        fontWeight: 500,
+        display: "inline-block",
+      }}
+    >
+      {label}
+    </span>
+  );
+}
+
+function ASNCard({ title, data, color }) {
+  if (!data) return null;
+  const accentColor = color === "blue" ? "#2D6EFF" : "#7c3aed";
+  const fields = Object.entries(data);
 
   return (
-    <div style={S.page}>
-      <div style={S.header}>
-        <span style={{ fontSize:26 }}>🏥</span>
-        <div style={{ flex:1 }}>
-          <div style={{ fontSize:17, fontWeight:600 }}>Hospital Supply Chain</div>
-          <div style={{ fontSize:11, color:"#8b8fa8" }}>{user.org}</div>
-        </div>
-        <button style={S.btnSm("#22c55e")} onClick={exportKPIs}>Download KPIs</button>
-      </div>
-      <div style={{ padding:"24px", maxWidth:1100, margin:"0 auto" }}>
-        <div style={{ background:"#450a0a", border:"1px solid #ef4444", borderRadius:10, padding:"12px 18px", marginBottom:20, display:"flex", alignItems:"center", gap:12 }}>
-          <span>🚨</span>
-          <div>
-            <span style={{ fontWeight:600, color:"#ef4444", fontSize:13 }}>Active recall — Stryker Triathlon Knee System (BT-20240501)</span>
-            <span style={{ fontSize:12, color:"#fca5a5", marginLeft:12 }}>Class II | TGA-RC-2024-0412</span>
+    <div style={styles.asnCard}>
+      <div style={{ ...styles.asnCardHeader, borderLeftColor: accentColor }}>
+        <div>
+          <div style={{ fontSize: "12px", color: "#6b7280", fontWeight: 500, textTransform: "uppercase", letterSpacing: "0.05em" }}>
+            {title}
           </div>
-          <button style={{ marginLeft:"auto", padding:"5px 14px", background:"#ef4444", border:"none", borderRadius:6, color:"#fff", fontSize:12, fontWeight:600, cursor:"pointer" }} onClick={() => onNav("recall")}>Respond</button>
+          <div style={{ fontSize: "15px", fontWeight: 600, color: "#111827", marginTop: "2px" }}>
+            {data.asnNumber || data.shipmentId || "ASN Generated"}
+          </div>
         </div>
-        <div style={{ display:"grid", gridTemplateColumns:"repeat(6,1fr)", gap:12, marginBottom:24 }}>
-          {[["ASNs pending","3","#f59e0b"],["GRNs today","7","#22c55e"],["Consignment","386","#4f8ef7"],["Expiring 30d","4","#ef4444"],["Fill rate","99.2%","#22c55e"],["Recalls","1","#ef4444"]].map(([l,v,c]) => (
-            <div key={l} style={S.metric}>
-              <div style={{ fontSize:11, color:"#8b8fa8", marginBottom:4 }}>{l}</div>
-              <div style={{ fontSize:20, fontWeight:700, color:c }}>{v}</div>
-            </div>
-          ))}
-        </div>
-        <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fill,minmax(300px,1fr))", gap:14, marginBottom:20 }}>
-          {MODULES.map(m => (
-            <div key={m.id} style={{ ...S.card, cursor:"pointer", borderLeft:"3px solid "+m.color }} onClick={() => onNav(m.id)}>
-              <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", marginBottom:10 }}>
-                <div style={{ display:"flex", alignItems:"center", gap:10 }}>
-                  <span style={{ fontSize:24 }}>{m.icon}</span>
-                  <div>
-                    <div style={{ fontSize:14, fontWeight:600 }}>{m.title}</div>
-                    <span style={{ fontSize:11, padding:"2px 8px", borderRadius:4, background:m.color+"22", color:m.color, fontWeight:600 }}>{m.kpi}</span>
-                  </div>
-                </div>
-                <span style={{ color:"#2a2d3a" }}>→</span>
-              </div>
-              <div style={{ fontSize:12, color:"#8b8fa8", lineHeight:1.6 }}>{m.desc}</div>
-            </div>
-          ))}
-        </div>
-        <div style={{ ...S.card, display:"flex", gap:10, flexWrap:"wrap", alignItems:"center" }}>
-          <span style={{ fontSize:12, color:"#8b8fa8", fontWeight:600 }}>Quick actions:</span>
-          <button style={S.btnSm("#f59e0b")} onClick={() => sendExpiryAlert([{desc:"Micra AV Pacemaker",sku:"MDT-MIC-002",batch:"BT-20240312",expiry:"2024-08-01",days:8,qty:1}])}>Send expiry alert</button>
-          <button style={S.btnSm("#4f8ef7")} onClick={() => printAsPDF("Dashboard")}>Print dashboard</button>
-          <button style={S.btnSm("#22c55e")} onClick={exportKPIs}>Export CSV</button>
-          <button style={S.btnSm("#ef4444")} onClick={() => onNav("recall")}>Recall response</button>
-        </div>
+        <Badge label="Parsed" color={color === "blue" ? "blue" : "purple"} />
       </div>
+      <div style={styles.asnFields}>
+        {fields.map(([key, val]) => {
+          if (key === "lineItems" || !val) return null;
+          return (
+            <div key={key} style={styles.asnField}>
+              <span style={styles.asnFieldKey}>{key.replace(/([A-Z])/g, " $1").trim()}</span>
+              <span style={styles.asnFieldVal}>{String(val)}</span>
+            </div>
+          );
+        })}
+      </div>
+      {data.lineItems && Array.isArray(data.lineItems) && data.lineItems.length > 0 && (
+        <div style={styles.lineItemsSection}>
+          <div style={styles.lineItemsHeader}>Line Items ({data.lineItems.length})</div>
+          <table style={styles.table}>
+            <thead>
+              <tr>
+                {Object.keys(data.lineItems[0]).map((k) => (
+                  <th key={k} style={styles.th}>
+                    {k.replace(/([A-Z])/g, " $1").trim()}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {data.lineItems.map((item, i) => (
+                <tr key={i} style={i % 2 === 0 ? styles.trEven : {}}>
+                  {Object.values(item).map((v, j) => (
+                    <td key={j} style={styles.td}>
+                      {String(v || "—")}
+                    </td>
+                  ))}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
     </div>
   );
 }
 
 export default function App() {
   const [user, setUser] = useState(null);
-  const [screen, setScreen] = useState("dashboard");
+  const [activeTab, setActiveTab] = useState("parser");
+  const [email, setEmail] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [result, setResult] = useState(null);
+  const [error, setError] = useState("");
+  const [copied, setCopied] = useState("");
 
-  if (!user) return <Login onLogin={setUser} />;
+  if (!user) return <LoginScreen onLogin={setUser} />;
 
-  const SCREENS = {
-    dashboard: <Dashboard onNav={setScreen} user={user} />,
-    asn: <ASNParser />,
-    inbound: <InboundReceiving />,
-    consignment: <ConsignmentTracker />,
-    expiry: <ExpiryManagement />,
-    ward: <WardDistribution />,
-    recall: <RecallManagement />,
+  const parseEmail = async () => {
+    if (!email.trim()) { setError("Paste a supplier email first."); return; }
+    setLoading(true);
+    setError("");
+    setResult(null);
+    try {
+      const res = await fetch("/api/parse-email", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Parse failed");
+      setResult(data);
+    } catch (e) {
+      setError(e.message || "Something went wrong. Check your API key.");
+    } finally {
+      setLoading(false);
+    }
   };
 
+  const copyJSON = (obj, label) => {
+    navigator.clipboard.writeText(JSON.stringify(obj, null, 2));
+    setCopied(label);
+    setTimeout(() => setCopied(""), 2000);
+  };
+
+  const sendEmail = () => {
+    if (!result) return;
+    const subject = encodeURIComponent(`ASN Confirmation - ${result.salesforce?.purchaseOrder || "New ASN"}`);
+    const body = encodeURIComponent(
+      `Dear Supplier,\n\nWe have received and processed your ASN.\n\nASN Number: ${result.salesforce?.asnNumber || "N/A"}\nPO Number: ${result.salesforce?.purchaseOrder || "N/A"}\nETA: ${result.salesforce?.eta || "N/A"}\nStatus: Received & Verified\n\nThank you.\n\nWarehouse Team`
+    );
+    window.open(`https://mail.google.com/mail/?view=cm&to=&su=${subject}&body=${body}`, "_blank");
+  };
+
+  const tabs = [
+    { id: "parser", label: "ASN Parser" },
+    { id: "about", label: "About" },
+  ];
+
   return (
-    <div>
-      <div style={{ background:"#0a0c12", padding:"8px 20px", borderBottom:bdr, display:"flex", alignItems:"center", gap:12 }}>
-        {screen !== "dashboard" && (
-          <button style={{ padding:"4px 12px", borderRadius:6, fontSize:12, cursor:"pointer", border:bdr, background:"transparent", color:"#8b8fa8" }} onClick={() => setScreen("dashboard")}>Back to Dashboard</button>
+    <div style={styles.app}>
+      {/* Top nav */}
+      <nav style={styles.nav}>
+        <div style={styles.navLeft}>
+          <span style={styles.logoIcon}>⬡</span>
+          <span style={styles.logoText}>
+            Supply<span style={{ color: "#5A8FFF" }}>Chain</span> AI
+          </span>
+        </div>
+        <div style={styles.navCenter}>
+          {tabs.map((t) => (
+            <button
+              key={t.id}
+              style={{ ...styles.tabBtn, ...(activeTab === t.id ? styles.tabBtnActive : {}) }}
+              onClick={() => setActiveTab(t.id)}
+            >
+              {t.label}
+            </button>
+          ))}
+        </div>
+        <div style={styles.navRight}>
+          <span style={styles.userBadge}>👤 {user}</span>
+          <button style={styles.btnGhost} onClick={() => setUser(null)}>
+            Sign out
+          </button>
+        </div>
+      </nav>
+
+      {/* Content */}
+      <main style={styles.main}>
+        {activeTab === "parser" && (
+          <div>
+            {/* Header */}
+            <div style={styles.pageHeader}>
+              <h1 style={styles.h1}>ASN Parser</h1>
+              <p style={styles.pageDesc}>
+                Paste a supplier email below. AI extracts structured ASN data for both Salesforce and SAP.
+              </p>
+            </div>
+
+            {/* Sample email quick-load */}
+            <div style={styles.sampleRow}>
+              <span style={{ fontSize: "13px", color: "#6b7280", marginRight: "8px" }}>Load sample:</span>
+              <button style={styles.btnSample} onClick={() => setEmail(SAMPLE_EMAILS.local)}>
+                🇦🇺 Local supplier
+              </button>
+              <button style={styles.btnSample} onClick={() => setEmail(SAMPLE_EMAILS.international)}>
+                🌐 International import
+              </button>
+            </div>
+
+            {/* Input area */}
+            <div style={styles.card}>
+              <label style={styles.label}>Supplier email</label>
+              <textarea
+                style={styles.textarea}
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="Paste supplier email here…&#10;&#10;Include: PO number, ship date, ETA, carrier, tracking, line items with SKUs and quantities."
+                rows={12}
+              />
+              <div style={styles.inputActions}>
+                <button style={styles.btnGhost} onClick={() => { setEmail(""); setResult(null); setError(""); }}>
+                  Clear
+                </button>
+                <button
+                  style={{ ...styles.btnPrimary, minWidth: "160px" }}
+                  onClick={parseEmail}
+                  disabled={loading}
+                >
+                  {loading ? (
+                    <span style={{ display: "flex", alignItems: "center", gap: "8px", justifyContent: "center" }}>
+                      <span style={styles.spinner} /> Parsing…
+                    </span>
+                  ) : (
+                    "⚡ Parse email"
+                  )}
+                </button>
+              </div>
+            </div>
+
+            {error && (
+              <div style={styles.errorBox}>
+                <strong>Error:</strong> {error}
+              </div>
+            )}
+
+            {/* Results */}
+            {result && (
+              <div>
+                <div style={styles.resultsHeader}>
+                  <h2 style={styles.h2}>Parsed ASN output</h2>
+                  <div style={{ display: "flex", gap: "8px" }}>
+                    <button style={styles.btnGhost} onClick={sendEmail}>
+                      ✉️ Send confirmation email
+                    </button>
+                  </div>
+                </div>
+
+                <div style={styles.asnGrid}>
+                  <div>
+                    <div style={styles.asnLabel}>Salesforce format</div>
+                    <ASNCard title="Salesforce ASN" data={result.salesforce} color="blue" />
+                    <button
+                      style={{ ...styles.btnGhost, width: "100%", marginTop: "8px" }}
+                      onClick={() => copyJSON(result.salesforce, "sf")}
+                    >
+                      {copied === "sf" ? "✓ Copied!" : "Copy JSON"}
+                    </button>
+                  </div>
+                  <div>
+                    <div style={styles.asnLabel}>SAP format</div>
+                    <ASNCard title="SAP ASN" data={result.sap} color="purple" />
+                    <button
+                      style={{ ...styles.btnGhost, width: "100%", marginTop: "8px" }}
+                      onClick={() => copyJSON(result.sap, "sap")}
+                    >
+                      {copied === "sap" ? "✓ Copied!" : "Copy JSON"}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
         )}
-        <span style={{ fontSize:12, color:"#8b8fa8" }}>🏥 {user.org}</span>
-        <span style={{ fontSize:12, color:"#8b8fa8", marginLeft:8 }}>{user.role === "admin" ? "Admin" : "Staff"} — {user.username}</span>
-        <button style={{ marginLeft:"auto", padding:"4px 12px", borderRadius:6, fontSize:12, cursor:"pointer", border:bdr, background:"transparent", color:"#8b8fa8" }} onClick={() => { setUser(null); setScreen("dashboard"); }}>Sign out</button>
-      </div>
-      {SCREENS[screen]}
+
+        {activeTab === "about" && (
+          <div style={{ maxWidth: "600px" }}>
+            <div style={styles.pageHeader}>
+              <h1 style={styles.h1}>About</h1>
+            </div>
+            <div style={styles.card}>
+              <h3 style={{ fontSize: "15px", fontWeight: 600, marginBottom: "12px" }}>Supply Chain AI</h3>
+              <p style={{ fontSize: "14px", color: "#4b5563", lineHeight: "1.7", marginBottom: "16px" }}>
+                This tool parses unstructured supplier emails and extracts structured ASN (Advanced Shipment Notice) 
+                data in both Salesforce and SAP-compatible formats, using Groq LLaMA 3.3 70B.
+              </p>
+              <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+                {[
+                  ["AI model", "Groq LLaMA 3.3 70B"],
+                  ["Hosting", "Vercel (Hobby — free)"],
+                  ["Formats", "Salesforce + SAP dual output"],
+                  ["Auth", "Username / password protected"],
+                  ["Version", "2.0 — June 2026"],
+                ].map(([k, v]) => (
+                  <div key={k} style={styles.asnField}>
+                    <span style={styles.asnFieldKey}>{k}</span>
+                    <span style={styles.asnFieldVal}>{v}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
+      </main>
     </div>
   );
 }
+
+const styles = {
+  app: {
+    minHeight: "100vh",
+    background: "#f9fafb",
+    fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
+    color: "#111827",
+  },
+  nav: {
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "space-between",
+    padding: "0 2rem",
+    height: "56px",
+    background: "#ffffff",
+    borderBottom: "1px solid #e5e7eb",
+    position: "sticky",
+    top: 0,
+    zIndex: 100,
+  },
+  navLeft: { display: "flex", alignItems: "center", gap: "8px" },
+  navCenter: { display: "flex", gap: "4px" },
+  navRight: { display: "flex", alignItems: "center", gap: "12px" },
+  logoIcon: { fontSize: "20px", color: "#2D6EFF" },
+  logoText: { fontSize: "16px", fontWeight: 700, letterSpacing: "-0.02em" },
+  userBadge: { fontSize: "13px", color: "#6b7280" },
+  tabBtn: {
+    background: "transparent",
+    border: "none",
+    padding: "6px 14px",
+    borderRadius: "6px",
+    fontSize: "14px",
+    cursor: "pointer",
+    color: "#6b7280",
+    fontFamily: "inherit",
+    fontWeight: 500,
+  },
+  tabBtnActive: {
+    background: "#eff6ff",
+    color: "#2D6EFF",
+  },
+  main: { maxWidth: "1100px", margin: "0 auto", padding: "2rem 1.5rem 4rem" },
+  pageHeader: { marginBottom: "1.5rem" },
+  h1: { fontSize: "22px", fontWeight: 700, color: "#111827", marginBottom: "6px" },
+  h2: { fontSize: "17px", fontWeight: 600, color: "#111827" },
+  pageDesc: { fontSize: "14px", color: "#6b7280", lineHeight: "1.6" },
+  sampleRow: { display: "flex", alignItems: "center", marginBottom: "12px", flexWrap: "wrap", gap: "6px" },
+  btnSample: {
+    background: "#f3f4f6",
+    border: "1px solid #e5e7eb",
+    borderRadius: "6px",
+    padding: "5px 12px",
+    fontSize: "12px",
+    cursor: "pointer",
+    fontFamily: "inherit",
+    color: "#374151",
+  },
+  card: {
+    background: "#ffffff",
+    border: "1px solid #e5e7eb",
+    borderRadius: "12px",
+    padding: "1.25rem",
+    marginBottom: "1.5rem",
+  },
+  label: { display: "block", fontSize: "13px", fontWeight: 500, color: "#374151", marginBottom: "6px" },
+  input: {
+    width: "100%",
+    padding: "8px 12px",
+    border: "1px solid #e5e7eb",
+    borderRadius: "8px",
+    fontSize: "14px",
+    fontFamily: "inherit",
+    color: "#111827",
+    background: "#fff",
+    outline: "none",
+    boxSizing: "border-box",
+  },
+  textarea: {
+    width: "100%",
+    padding: "10px 12px",
+    border: "1px solid #e5e7eb",
+    borderRadius: "8px",
+    fontSize: "13px",
+    fontFamily: "ui-monospace, 'SF Mono', monospace",
+    color: "#111827",
+    background: "#f9fafb",
+    resize: "vertical",
+    outline: "none",
+    lineHeight: "1.6",
+    boxSizing: "border-box",
+  },
+  inputActions: { display: "flex", justifyContent: "flex-end", gap: "8px", marginTop: "12px" },
+  btnPrimary: {
+    background: "#2D6EFF",
+    color: "#fff",
+    border: "none",
+    borderRadius: "8px",
+    padding: "9px 20px",
+    fontSize: "14px",
+    fontWeight: 600,
+    cursor: "pointer",
+    fontFamily: "inherit",
+  },
+  btnGhost: {
+    background: "transparent",
+    color: "#374151",
+    border: "1px solid #e5e7eb",
+    borderRadius: "8px",
+    padding: "8px 16px",
+    fontSize: "13px",
+    cursor: "pointer",
+    fontFamily: "inherit",
+  },
+  errorBox: {
+    background: "#fef2f2",
+    border: "1px solid #fecaca",
+    borderRadius: "8px",
+    padding: "12px 16px",
+    fontSize: "14px",
+    color: "#991b1b",
+    marginBottom: "1.5rem",
+  },
+  resultsHeader: {
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: "12px",
+    flexWrap: "wrap",
+    gap: "8px",
+  },
+  asnGrid: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px" },
+  asnLabel: { fontSize: "12px", fontWeight: 500, color: "#6b7280", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: "6px" },
+  asnCard: {
+    background: "#fff",
+    border: "1px solid #e5e7eb",
+    borderRadius: "12px",
+    overflow: "hidden",
+  },
+  asnCardHeader: {
+    display: "flex",
+    alignItems: "flex-start",
+    justifyContent: "space-between",
+    padding: "14px 16px",
+    borderBottom: "1px solid #f3f4f6",
+    borderLeft: "4px solid #2D6EFF",
+    background: "#fafafa",
+  },
+  asnFields: { padding: "12px 16px", display: "flex", flexDirection: "column", gap: "6px" },
+  asnField: {
+    display: "flex",
+    justifyContent: "space-between",
+    alignItems: "flex-start",
+    gap: "8px",
+    fontSize: "13px",
+    padding: "4px 0",
+    borderBottom: "1px solid #f3f4f6",
+  },
+  asnFieldKey: { color: "#6b7280", flex: "0 0 140px", fontWeight: 500, textTransform: "capitalize" },
+  asnFieldVal: { color: "#111827", textAlign: "right", wordBreak: "break-all" },
+  lineItemsSection: { borderTop: "1px solid #f3f4f6" },
+  lineItemsHeader: {
+    padding: "8px 16px",
+    fontSize: "12px",
+    fontWeight: 600,
+    color: "#374151",
+    background: "#f9fafb",
+    textTransform: "uppercase",
+    letterSpacing: "0.05em",
+  },
+  table: { width: "100%", borderCollapse: "collapse", fontSize: "12px" },
+  th: {
+    padding: "8px 12px",
+    textAlign: "left",
+    fontWeight: 600,
+    color: "#6b7280",
+    background: "#f3f4f6",
+    borderBottom: "1px solid #e5e7eb",
+    whiteSpace: "nowrap",
+    textTransform: "capitalize",
+  },
+  td: { padding: "8px 12px", borderBottom: "1px solid #f3f4f6", color: "#111827" },
+  trEven: { background: "#fafafa" },
+  spinner: {
+    display: "inline-block",
+    width: "14px",
+    height: "14px",
+    border: "2px solid rgba(255,255,255,0.3)",
+    borderTop: "2px solid #fff",
+    borderRadius: "50%",
+    animation: "spin 0.8s linear infinite",
+  },
+  // Login
+  loginBg: {
+    minHeight: "100vh",
+    background: "linear-gradient(135deg, #0B1628 0%, #112040 100%)",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
+  },
+  loginCard: {
+    background: "#ffffff",
+    borderRadius: "16px",
+    padding: "2.5rem",
+    width: "360px",
+    boxShadow: "0 25px 50px rgba(0,0,0,0.4)",
+  },
+  loginLogo: { display: "flex", alignItems: "center", gap: "8px", marginBottom: "4px" },
+  loginSub: { fontSize: "13px", color: "#6b7280", marginBottom: "2rem" },
+  loginHint: { fontSize: "11px", color: "#9ca3af", textAlign: "center", marginTop: "1rem" },
+  field: { marginBottom: "1rem" },
+  errMsg: {
+    background: "#fef2f2",
+    border: "1px solid #fecaca",
+    borderRadius: "8px",
+    padding: "10px 14px",
+    fontSize: "13px",
+    color: "#991b1b",
+  },
+};
